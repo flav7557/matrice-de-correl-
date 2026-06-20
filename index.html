@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrice de corrélation cross-asset</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e16;--panel:#111726;--panel-2:#0e1320;--line:#1e2638;--line-soft:#17202f;
+    --text:#e6e9ef;--muted:#8a93a6;--muted-2:#5e6678;--accent:#e0a458;--accent-dim:#caa05a33;
+    --pos:#e6684e;--neg:#3a86b0;--good:#5fb88a;--bad:#e06a5a;
+  }
+  *{box-sizing:border-box}html,body{margin:0;padding:0}
+  body{background:radial-gradient(1200px 600px at 80% -10%,#15203010,transparent),var(--bg);
+    color:var(--text);font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+    min-height:100vh;padding:32px 28px 60px}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px;max-width:1180px;margin:0 auto 22px}
+  .title-block h1{font-size:24px;font-weight:600;letter-spacing:-0.02em;margin:0;line-height:1.1}
+  .title-block h1 .rho{color:var(--accent);font-weight:700}
+  .controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted-2);font-weight:600}
+  select{font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--text);background:var(--panel);
+    border:1px solid var(--line);border-radius:8px;padding:9px 12px;cursor:pointer;transition:border-color .15s}
+  select:hover{border-color:#2c3852}select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .status{max-width:1180px;margin:0 auto 18px;display:flex;flex-wrap:wrap;gap:18px;align-items:center;font-size:12px;color:var(--muted)}
+  .status .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);display:inline-block;margin-right:7px;vertical-align:middle}
+  .status.live .dot{background:var(--good);box-shadow:0 0 10px #5fb88a88}
+  .status b{color:var(--text);font-weight:500}.status .warn{color:var(--accent)}
+  .board{max-width:1180px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 22px 18px;position:relative;overflow:auto}
+  .matrix-wrap{min-width:560px}
+  .matrix{display:grid;gap:3px;align-items:stretch}
+  .cell{position:relative;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;min-height:46px;user-select:none}
+  .cell.data{cursor:pointer;transition:transform .1s,box-shadow .1s,outline-color .1s;outline:1px solid transparent}
+  .cell.data:hover{transform:scale(1.06);z-index:5;box-shadow:0 6px 18px #0009;outline-color:#ffffff44}
+  .cell.diag{background:#0c1119;color:var(--accent);border:1px solid var(--line);font-weight:600}
+  .cell.corner{background:transparent}
+  .cell.corner .rho-badge{font-family:'IBM Plex Mono',monospace;color:var(--muted-2);font-size:18px}
+  .hd{background:transparent;color:var(--muted);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;min-height:auto;padding:6px 2px}
+  .hd.col{padding-bottom:8px}.hd.row{justify-content:flex-end;padding-right:10px;text-align:right}
+  .hd .cls-d{width:6px;height:6px;border-radius:2px;display:inline-block;margin-right:6px;opacity:.85}
+  .hd.col .label{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .hd.col .cls-d{margin:0}
+  .c-Actions{background:#6c8cff}.c-Taux{background:#5fb88a}.c-Commodités{background:#e0a458}
+  .c-FX{background:#c77dff}.c-Crypto{background:#e6684e}.c-Volatilité{background:#8a93a6}
+  .legend{max-width:1180px;margin:16px auto 0;display:flex;flex-wrap:wrap;align-items:center;gap:24px;justify-content:space-between}
+  .scale{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted)}
+  .scale .bar{width:200px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--neg),#1a2030 50%,var(--pos))}
+  .classes{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--muted)}
+  .classes span{display:flex;align-items:center;gap:6px}
+  .classes .cls-d{width:8px;height:8px;border-radius:2px;display:inline-block}
+  #tip{position:fixed;pointer-events:none;z-index:60;background:#0c1119;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);opacity:0;transition:opacity .1s;box-shadow:0 8px 24px #000a;max-width:240px}
+  #tip .v{font-family:'IBM Plex Mono',monospace;font-weight:600}
+  .overlay{position:absolute;inset:0;background:#0a0e16e8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;border-radius:14px;z-index:20;text-align:center;padding:24px}
+  .spinner{width:34px;height:34px;border:3px solid #1f2838;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  .overlay p{color:var(--muted);font-size:13px;margin:0;max-width:440px;line-height:1.5}
+  .overlay .sub{color:var(--muted-2);font-size:11px;font-family:'IBM Plex Mono',monospace}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .modal-back{position:fixed;inset:0;background:#05080daa;backdrop-filter:blur(4px);z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .18s}
+  .modal-back.open{opacity:1;pointer-events:auto}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:min(880px,100%);max-height:92vh;overflow:auto;transform:translateY(8px) scale(.99);transition:transform .18s}
+  .modal-back.open .modal{transform:none}
+  .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:22px 24px 0}
+  .modal-head h2{margin:0;font-size:19px;font-weight:600;letter-spacing:-0.01em}
+  .modal-head h2 .x{color:var(--muted-2);margin:0 8px;font-weight:400}
+  .modal-head .pairtags{display:flex;gap:8px;margin-top:8px}
+  .modal-head .pairtag{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+  .modal-head .pairtag .cls-d{width:7px;height:7px;border-radius:2px}
+  .close-btn{background:transparent;border:none;color:var(--muted);font-size:22px;line-height:1;padding:4px 8px;cursor:pointer}
+  .close-btn:hover{color:var(--text)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line-soft);margin:18px 24px 0;border-radius:10px;overflow:hidden;border:1px solid var(--line-soft)}
+  .stat{background:var(--panel-2);padding:12px 14px}
+  .stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2);font-weight:600}
+  .stat .v{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;margin-top:3px}
+  .stat .v.pos{color:var(--pos)}.stat .v.neg{color:var(--neg)}
+  .chart-section{padding:18px 24px 4px}
+  .chart-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;gap:10px;flex-wrap:wrap}
+  .chart-head h3{margin:0;font-size:13px;font-weight:600;color:var(--text)}
+  .chart-head .desc{font-size:11px;color:var(--muted-2)}
+  .toggle{display:flex;gap:4px;flex-wrap:wrap}
+  .toggle button{padding:5px 9px;font-size:11px;border-radius:6px;font-family:'Space Grotesk',sans-serif;color:var(--text);background:var(--panel);border:1px solid var(--line);cursor:pointer;transition:border-color .12s,background .12s}
+  .toggle button:hover{border-color:#2c3852}
+  .toggle button.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+  .range-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;flex-wrap:wrap}
+  .range-row .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2);font-weight:600;margin-right:2px}
+  .linkbtn{background:none;border:none;color:var(--muted);font-size:11.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:4px}
+  .linkbtn:hover{color:var(--accent)}
+  .chart-box{position:relative;height:240px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:10px;padding:10px}
+  .chart-box.tall{height:300px}
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .modal-foot{padding:14px 24px 22px;color:var(--muted-2);font-size:11px;line-height:1.5}
+  @media (max-width:720px){body{padding:20px 14px 50px}.chart-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="title-block"><h1><span class="rho">ρ</span> Matrice de corrélation cross-asset</h1></div>
+  <div class="controls">
+    <div class="field">
+      <label for="period">Fenêtre de la matrice</label>
+      <select id="period">
+        <option value="63">3 mois</option>
+        <option value="126">6 mois</option>
+        <option value="252" selected>1 an</option>
+        <option value="9999">Tout (2 ans)</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<div class="status" id="status">
+  <span><span class="dot"></span><span id="status-text">Chargement…</span></span>
+  <span id="status-date"></span>
+  <span id="status-warn" class="warn"></span>
+</div>
+
+<div class="board">
+  <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
+  <div class="overlay" id="overlay">
+    <div class="spinner" id="spinner"></div>
+    <p id="overlay-text">Lecture des données…</p>
+    <p class="sub" id="overlay-sub"></p>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="scale"><span class="mono">−1</span><span class="bar"></span><span class="mono">+1</span><span style="margin-left:6px">corrélation</span></div>
+  <div class="classes" id="classes"></div>
+</div>
+
+<div id="tip"><div id="tip-pair"></div><div class="v" id="tip-val"></div></div>
+
+<div class="modal-back" id="modal-back">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <div><h2 id="m-title"></h2><div class="pairtags" id="m-tags"></div></div>
+      <button class="close-btn" id="m-close" aria-label="Fermer">×</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Corrélation</div><div class="v" id="s-corr">—</div></div>
+      <div class="stat"><div class="k">Bêta</div><div class="v" id="s-beta">—</div></div>
+      <div class="stat"><div class="k">R²</div><div class="v" id="s-r2">—</div></div>
+      <div class="stat"><div class="k">Observations</div><div class="v" id="s-n">—</div></div>
+    </div>
+    <div class="chart-section">
+      <div class="range-row">
+        <div class="toggle" id="range-toggle">
+          <span class="lbl">Période</span>
+          <button data-r="21">1M</button><button data-r="63">3M</button><button data-r="126">6M</button>
+          <button data-r="252">1A</button><button data-r="0" class="on">Max</button>
+        </div>
+        <button class="linkbtn" id="reset-zoom">Réinitialiser le zoom</button>
+      </div>
+      <div class="chart-head">
+        <div><h3>Corrélation glissante</h3><div class="desc">glisse pour te déplacer · molette ou pincement pour zoomer</div></div>
+        <div class="toggle" id="win-toggle">
+          <span class="lbl">Lissage</span>
+          <button data-w="10">10 j</button><button data-w="30">30 j</button>
+          <button data-w="60" class="on">60 j</button><button data-w="90">90 j</button>
+        </div>
+      </div>
+      <div class="chart-box tall"><canvas id="chart-roll"></canvas></div>
+    </div>
+    <div class="chart-section">
+      <div class="chart-grid">
+        <div><div class="chart-head"><h3>Nuage des rendements</h3></div><div class="chart-box"><canvas id="chart-scatter"></canvas></div></div>
+        <div><div class="chart-head"><h3>Performance rebasée (100)</h3></div><div class="chart-box"><canvas id="chart-price"></canvas></div></div>
+      </div>
+    </div>
+    <div class="modal-foot" id="m-foot"></div>
+  </div>
+</div>
+
+<script>
+/* données depuis data.json (même origine, aucun proxy) */
+if(window.ChartZoom){try{Chart.register(window.ChartZoom);}catch(e){}}
+
+let DATA=null, SERIES={}, ASSETS=[], OK=[], CORR=[];
+let rollWindow=60, detailRange=0, currentPair=null, windowDays=252;
+const charts={roll:null,scatter:null,price:null};
+const CLASS_ORDER=['Actions','Taux','Commodités','FX','Crypto','Volatilité'];
+let CLASSES=[];
+
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+function pearson(a,b){const n=a.length;if(n<3)return NaN;const ma=mean(a),mb=mean(b);
+  let num=0,da=0,db=0;for(let i=0;i<n;i++){const x=a[i]-ma,y=b[i]-mb;num+=x*y;da+=x*x;db+=y*y;}
+  const d=Math.sqrt(da*db);return d===0?NaN:num/d;}
+const returns=p=>p.slice(1).map((v,i)=>p[i]>0?v/p[i]-1:0);
+function ols(x,y){const n=x.length,mx=mean(x),my=mean(y);let sxy=0,sxx=0;
+  for(let i=0;i<n;i++){sxy+=(x[i]-mx)*(y[i]-my);sxx+=(x[i]-mx)**2;}
+  const slope=sxx===0?0:sxy/sxx,r=pearson(x,y);return{slope,intercept:my-slope*mx,r,r2:r*r};}
+
+function cutoffDate(){if(windowDays>=9999)return'0000';const idx=Math.max(0,DATA.dates.length-windowDays);return DATA.dates[idx];}
+function pairAligned(a,b){const da=SERIES[a],db=SERIES[b],cut=cutoffDate();
+  const dates=[...da.keys()].filter(d=>db.has(d)&&d>=cut).sort();
+  const pa=dates.map(d=>da.get(d)),pb=dates.map(d=>db.get(d));
+  return{dates,pa,pb,ra:returns(pa),rb:returns(pb),rdates:dates.slice(1)};}
+function pairAlignedFull(a,b){const da=SERIES[a],db=SERIES[b];
+  const dates=[...da.keys()].filter(d=>db.has(d)).sort();
+  const pa=dates.map(d=>da.get(d)),pb=dates.map(d=>db.get(d));
+  return{dates,pa,pb,ra:returns(pa),rb:returns(pb),rdates:dates.slice(1)};}
+function rollingCorr(ra,rb,rdates,w){const out={dates:[],vals:[]};
+  for(let t=w-1;t<ra.length;t++){out.dates.push(rdates[t]);out.vals.push(pearson(ra.slice(t-w+1,t+1),rb.slice(t-w+1,t+1)));}
+  return out;}
+
+async function init(){
+  try{const res=await fetch('./data.json?v='+Date.now());if(!res.ok)throw 0;DATA=await res.json();}
+  catch(e){
+    document.getElementById('spinner').style.display='none';
+    document.getElementById('overlay-text').innerHTML="Aucun fichier <b>data.json</b> trouvé.<br>Lance une fois le workflow GitHub Actions (onglet Actions → Run workflow), puis recharge la page.";
+    setStatus(false,'En attente de la première génération','','');return;
+  }
+  ASSETS=DATA.shorts.map((s,i)=>({short:s,name:DATA.names[i],cls:DATA.classes[i],key:s}));
+  DATA.shorts.forEach(s=>{const m=new Map();DATA.dates.forEach((d,k)=>{const v=DATA.prices[s][k];if(v!=null)m.set(d,v);});SERIES[s]=m;});
+  OK=ASSETS.filter(a=>SERIES[a.key]&&SERIES[a.key].size>5);
+  CLASSES=CLASS_ORDER.filter(c=>OK.some(a=>a.cls===c));
+  renderClasses();computeAndRender();
+  document.getElementById('overlay').style.display='none';
+  setStatus(true,`En ligne — ${OK.length} actifs`,`Dernier point <b>${fmtDate(DATA.asof)}</b> · généré le ${DATA.generated||''}`,'');
+}
+
+function computeAndRender(){
+  const n=OK.length;CORR=Array.from({length:n},()=>Array(n).fill(NaN));
+  for(let i=0;i<n;i++)for(let j=i;j<n;j++){
+    if(i===j){CORR[i][j]=1;continue;}
+    const p=pairAligned(OK[i].key,OK[j].key),c=pearson(p.ra,p.rb);CORR[i][j]=c;CORR[j][i]=c;
+  }
+  renderMatrix();
+}
+
+function renderMatrix(){
+  const n=OK.length,grid=document.getElementById('matrix');grid.innerHTML='';
+  grid.style.gridTemplateColumns=`minmax(78px,auto) repeat(${n},minmax(46px,1fr))`;
+  const corner=el('div','cell corner');corner.innerHTML='<span class="rho-badge">ρ</span>';grid.appendChild(corner);
+  OK.forEach(a=>{const h=el('div','hd col');const lab=el('div','label');
+    lab.innerHTML=`<span class="cls-d c-${a.cls}"></span><span>${a.short}</span>`;h.appendChild(lab);grid.appendChild(h);});
+  OK.forEach((rowA,i)=>{
+    const rh=el('div','hd row');rh.innerHTML=`<span class="cls-d c-${rowA.cls}"></span><span>${rowA.short}</span>`;grid.appendChild(rh);
+    OK.forEach((colB,j)=>{
+      const c=CORR[i][j];
+      if(i===j){const d=el('div','cell diag');d.textContent='1.00';grid.appendChild(d);return;}
+      const cell=el('div','cell data');
+      cell.style.background=corrColor(c);cell.style.color=Math.abs(c)>0.42?'#f4f6fb':'#aeb6c6';
+      cell.textContent=isFinite(c)?fmtCorr(c):'·';
+      cell.addEventListener('click',()=>openDetail(i,j));
+      cell.addEventListener('mousemove',ev=>showTip(ev,rowA,colB,c));
+      cell.addEventListener('mouseleave',hideTip);
+      grid.appendChild(cell);
+    });
+  });
+}
+
+/* ----- détail avec période + lissage + zoom ----- */
+function takeLast(arr,n){return(n<=0||n>=arr.length)?arr.slice():arr.slice(arr.length-n);}
+function detailData(a,b){
+  const p=pairAlignedFull(a,b),N=detailRange;
+  const ra=takeLast(p.ra,N),rb=takeLast(p.rb,N),rdates=takeLast(p.rdates,N);
+  const dates=takeLast(p.dates,N),pa=takeLast(p.pa,N),pb=takeLast(p.pb,N);
+  const w=Math.min(rollWindow,Math.max(5,p.ra.length-1));
+  const fr=rollingCorr(p.ra,p.rb,p.rdates,w),vis=new Set(rdates),roll={dates:[],vals:[]};
+  for(let i=0;i<fr.dates.length;i++)if(vis.has(fr.dates[i])){roll.dates.push(fr.dates[i]);roll.vals.push(fr.vals[i]);}
+  return{ra,rb,rdates,dates,pa,pb,roll};
+}
+function openDetail(i,j){
+  const A=OK[i],B=OK[j];currentPair={A,B};
+  document.getElementById('m-title').innerHTML=`${A.name} <span class="x">×</span> ${B.name}`;
+  document.getElementById('m-tags').innerHTML=
+    `<span class="pairtag"><span class="cls-d c-${A.cls}"></span>${A.cls}</span>`+
+    `<span class="pairtag"><span class="cls-d c-${B.cls}"></span>${B.cls}</span>`;
+  renderDetail();
+  document.getElementById('modal-back').classList.add('open');
+}
+function renderDetail(){
+  if(!currentPair)return;
+  const{A,B}=currentPair,d=detailData(A.key,B.key),reg=ols(d.ra,d.rb);
+  setStat('s-corr',reg.r,true);setV('s-beta',reg.slope.toFixed(2));
+  setV('s-r2',(reg.r2*100).toFixed(0)+'%');setV('s-n',d.ra.length);
+  const rangeLbl=detailRange<=0?'tout l\'historique':`${d.ra.length} jours`;
+  document.getElementById('m-foot').innerHTML=
+    `Stats calculées sur ${rangeLbl}. Bêta = pente de la régression des rendements de ${B.short} sur ${A.short}. La corrélation glissante reste lissée sur la fenêtre choisie même quand tu zoomes.`;
+  drawRolling(d);drawScatter(d,reg,A,B);drawPrice(d,A,B);
+}
+function drawRolling(d){
+  const full=pearson(d.ra,d.rb);
+  charts.roll&&charts.roll.destroy();
+  charts.roll=new Chart(document.getElementById('chart-roll'),{type:'line',
+    data:{labels:d.roll.dates,datasets:[
+      {data:d.roll.vals,borderColor:'#e0a458',borderWidth:1.6,pointRadius:0,tension:.15,fill:{target:'origin',above:'#e0a45814',below:'#3a86b014'}},
+      {data:d.roll.dates.map(()=>full),borderColor:'#5e6678',borderWidth:1,borderDash:[5,4],pointRadius:0}]},
+    options:rollOpts(full)});
+}
+function drawScatter(d,reg,A,B){
+  const pts=d.ra.map((x,k)=>({x:x*100,y:d.rb[k]*100})),xs=pts.map(q=>q.x);
+  const minX=Math.min(...xs),maxX=Math.max(...xs);
+  const line=[{x:minX,y:(reg.slope*minX/100+reg.intercept)*100},{x:maxX,y:(reg.slope*maxX/100+reg.intercept)*100}];
+  charts.scatter&&charts.scatter.destroy();
+  charts.scatter=new Chart(document.getElementById('chart-scatter'),{type:'scatter',
+    data:{datasets:[{data:pts,backgroundColor:'#6c8cff55',pointRadius:2.2},{type:'line',data:line,borderColor:'#e0a458',borderWidth:1.6,pointRadius:0}]},
+    options:scatterOpts(A.short,B.short)});
+}
+function drawPrice(d,A,B){
+  const base=arr=>arr.length?arr.map(v=>v/arr[0]*100):arr;
+  charts.price&&charts.price.destroy();
+  charts.price=new Chart(document.getElementById('chart-price'),{type:'line',
+    data:{labels:d.dates,datasets:[
+      {label:A.short,data:base(d.pa),borderColor:'#6c8cff',borderWidth:1.5,pointRadius:0,tension:.1},
+      {label:B.short,data:base(d.pb),borderColor:'#e0a458',borderWidth:1.5,pointRadius:0,tension:.1}]},
+    options:priceOpts()});
+}
+
+const GRID='#1c2536',TICK='#6b7488',FONT="'IBM Plex Mono', monospace";
+function rollOpts(full){return{responsive:true,maintainAspectRatio:false,animation:false,
+  scales:{y:{min:-1,max:1,grid:{color:GRID},ticks:{color:TICK,font:{family:FONT,size:10},stepSize:.5}},
+    x:{grid:{display:false},ticks:{color:TICK,font:{family:FONT,size:9},maxTicksLimit:8,autoSkip:true}}},
+  plugins:{legend:{display:false},
+    tooltip:{callbacks:{label:c=>c.datasetIndex===1?`moyenne ${full.toFixed(2)}`:`ρ glissante : ${c.parsed.y?.toFixed(2)}`}},
+    zoom:{pan:{enabled:true,mode:'x'},zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'}}}};}
+function scatterOpts(ax,ay){return{responsive:true,maintainAspectRatio:false,animation:false,
+  scales:{x:{title:{display:true,text:`${ax} (%/j)`,color:TICK,font:{family:FONT,size:10}},grid:{color:GRID},ticks:{color:TICK,font:{family:FONT,size:9}}},
+    y:{title:{display:true,text:`${ay} (%/j)`,color:TICK,font:{family:FONT,size:10}},grid:{color:GRID},ticks:{color:TICK,font:{family:FONT,size:9}}}},
+  plugins:{legend:{display:false},tooltip:{enabled:false}}};}
+function priceOpts(){return{responsive:true,maintainAspectRatio:false,animation:false,
+  scales:{y:{grid:{color:GRID},ticks:{color:TICK,font:{family:FONT,size:9}}},
+    x:{grid:{display:false},ticks:{color:TICK,font:{family:FONT,size:9},maxTicksLimit:6,autoSkip:true}}},
+  plugins:{legend:{display:true,labels:{color:'#aeb6c6',font:{family:FONT,size:10},boxWidth:14,boxHeight:2}}}};}
+
+function el(t,c){const e=document.createElement(t);if(c)e.className=c;return e;}
+function corrColor(r){if(!isFinite(r))return'#0e1320';r=Math.max(-1,Math.min(1,r));
+  const mid=[26,32,48],pos=[230,104,78],neg=[58,134,176],t=Math.abs(r),to=r>=0?pos:neg;
+  const c=mid.map((m,k)=>Math.round(m+(to[k]-m)*t));return`rgb(${c[0]},${c[1]},${c[2]})`;}
+const fmtCorr=c=>(c>=0?'':'−')+Math.abs(c).toFixed(2);
+function setV(id,v){const e=document.getElementById(id);e.textContent=v;e.className='v';}
+function setStat(id,r,sign){const e=document.getElementById(id);e.textContent=fmtCorr(r);e.className='v '+(sign?(r>=0?'pos':'neg'):'');}
+function fmtDate(d){if(!d)return'—';const[y,m,da]=d.split('-');return`${da}/${m}/${y}`;}
+function setStatus(live,text,date,warn){const s=document.getElementById('status');s.classList.toggle('live',live);
+  document.getElementById('status-text').textContent=text;document.getElementById('status-date').innerHTML=date||'';
+  document.getElementById('status-warn').textContent=warn||'';}
+const tip=document.getElementById('tip');
+function showTip(ev,A,B,c){document.getElementById('tip-pair').textContent=`${A.name} × ${B.name}`;
+  document.getElementById('tip-val').textContent=`ρ = ${fmtCorr(c)}`;tip.style.opacity='1';
+  let x=ev.clientX+14,y=ev.clientY+14;if(x+250>innerWidth)x=ev.clientX-250;tip.style.left=x+'px';tip.style.top=y+'px';}
+function hideTip(){tip.style.opacity='0';}
+function renderClasses(){const c=document.getElementById('classes');c.innerHTML='';
+  CLASSES.forEach(cl=>{const s=el('span');s.innerHTML=`<span class="cls-d c-${cl}"></span>${cl}`;c.appendChild(s);});}
+
+document.getElementById('period').addEventListener('change',e=>{windowDays=+e.target.value;computeAndRender();});
+document.getElementById('m-close').addEventListener('click',closeModal);
+document.getElementById('modal-back').addEventListener('click',e=>{if(e.target.id==='modal-back')closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+document.getElementById('win-toggle').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  rollWindow=+b.dataset.w;markOn('win-toggle',b);renderDetail();});
+document.getElementById('range-toggle').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  detailRange=+b.dataset.r;markOn('range-toggle',b);renderDetail();});
+document.getElementById('reset-zoom').addEventListener('click',()=>{if(charts.roll&&charts.roll.resetZoom)charts.roll.resetZoom();});
+function markOn(id,btn){[...document.getElementById(id).querySelectorAll('button')].forEach(x=>x.classList.toggle('on',x===btn));}
+function closeModal(){document.getElementById('modal-back').classList.remove('open');}
+
+init();
+</script>
+</body>
+</html>
