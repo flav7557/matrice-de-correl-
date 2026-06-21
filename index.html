@@ -107,6 +107,9 @@
     <div class="field">
       <label for="period">Fenêtre de la matrice</label>
       <select id="period">
+        <option value="5">1 semaine</option>
+        <option value="10">2 semaines</option>
+        <option value="21">1 mois</option>
         <option value="63">3 mois</option>
         <option value="126">6 mois</option>
         <option value="252" selected>1 an</option>
@@ -154,6 +157,7 @@
       <div class="range-row">
         <div class="toggle" id="range-toggle">
           <span class="lbl">Période</span>
+          <button data-r="5">1S</button><button data-r="10">2S</button>
           <button data-r="21">1M</button><button data-r="63">3M</button><button data-r="126">6M</button>
           <button data-r="252">1A</button><button data-r="0" class="on">Max</button>
         </div>
@@ -284,8 +288,9 @@ function renderDetail(){
   setStat('s-corr',reg.r,true);setV('s-beta',reg.slope.toFixed(2));
   setV('s-r2',(reg.r2*100).toFixed(0)+'%');setV('s-n',d.ra.length);
   const rangeLbl=detailRange<=0?'tout l\'historique':`${d.ra.length} jours`;
+  const noisy=(detailRange>0&&d.ra.length<=10)?' ⚠ Très peu de points : le chiffre est dominé par le bruit.':'';
   document.getElementById('m-foot').innerHTML=
-    `Stats calculées sur ${rangeLbl}. Bêta = pente de la régression des rendements de ${B.short} sur ${A.short}. La corrélation glissante reste lissée sur la fenêtre choisie même quand tu zoomes.`;
+    `Stats calculées sur ${rangeLbl}.${noisy} Bêta = pente de la régression des rendements de ${B.short} sur ${A.short}. La corrélation glissante reste lissée sur la fenêtre choisie même quand tu zoomes.`;
   drawRolling(d);drawScatter(d,reg,A,B);drawPrice(d,A,B);
 }
 function drawRolling(d){
